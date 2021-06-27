@@ -193,7 +193,8 @@ def my_info(update, context):
 
 
 def my_name(update, context):
-    full_name = cursor.execute('SELECT first_name, last_name FROM registration').fetchall()
+    full_name = cursor.execute("SELECT first_name, last_name FROM registration WHERE telegram_id='{}'"
+    .format(update.effective_chat.id)).fetchall()
     update.message.reply_text(full_name, reply_markup=ReplyKeyboardMarkup(
         [
             ['Back']
@@ -233,7 +234,7 @@ def main():
                 MessageHandler(Filters.regex('Order'), orders),
                 MessageHandler(Filters.regex('Settings'), settings),
                 MessageHandler(Filters.regex('Support'), support),
-                MessageHandler(Filters.regex('My Info'), my_info)
+                MessageHandler(Filters.regex('My info'), my_info)
             ],
             SETTINGS: [
                 MessageHandler(Filters.regex('Change'), change),
@@ -249,8 +250,8 @@ def main():
             MYINFO: [
                 MessageHandler(Filters.regex('My name'), my_name),
                 MessageHandler(Filters.regex('Back'), back_to_main_menu)
-
             ],
+
             MYNAME: [
                 MessageHandler(Filters.regex('Back'), my_info)
             ],
