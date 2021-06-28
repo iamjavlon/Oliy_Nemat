@@ -1,4 +1,4 @@
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, KeyboardButton, update
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, KeyboardButton, replymarkup, update
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -16,7 +16,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG
 )
 FIRST_NAME, LAST_NAME, PHONE, MAIN_MENU, SETTINGS, ORDERS, PRODUCTS, SUPPORT, CART, MYNAME, MYINFO, CHANGE, \
-CONTACT, BIRTHDAY = range(14)
+CONTACT, BIRTHDAY, MYAGE = range(15)
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def get_last_name(update, context):
     return BIRTHDAY
 
 def request_birthday(update, context):
-    current_date = datetime.today().strftime('%d.%m.%Y')
+    current_date = datetime.today().strftime('%Y.%m.%d')
     update.message.reply_text(f"Send your birthday in this format: <b>{current_date}</b>", 
     parse_mode="HTML")
     return BIRTHDAY
@@ -78,6 +78,8 @@ def get_birthday(update, context):
     birthday = update.message.text
     cursor.execute("UPDATE registration SET birthday = '{}' WHERE telegram_id = '{}'"
     .format(birthday, update.message.chat_id))
+    connector.commit()
+    cursor.execute("UPDATE registration SET age = CAST(round(strftime(CURRENT_DATE) - strftime(birthday)) as INT)")
     connector.commit()
     request_phone(update, context)
     return PHONE
@@ -185,6 +187,7 @@ def change(update, context):
 def my_info(update, context):
     buttons = [
         [KeyboardButton('My name')],
+        [KeyboardButton('My age')],
         [KeyboardButton('Back')]
     ]
     reply_markup = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
@@ -194,7 +197,7 @@ def my_info(update, context):
 
 def my_name(update, context):
     full_name = cursor.execute("SELECT first_name, last_name FROM registration WHERE telegram_id='{}'"
-    .format(update.effective_chat.id)).fetchall()
+    .format(update.effective_chat.id)).fetchall()[0][0:2]
     update.message.reply_text(full_name, reply_markup=ReplyKeyboardMarkup(
         [
             ['Back']
@@ -203,6 +206,15 @@ def my_name(update, context):
     connector.commit()
     return MYNAME
 
+def my_age(update, context):
+    age = cursor.execute("SELECT age FROM registration WHERE telegram_id = '{}'".format(update.effective_chat.id)).fetchall()[0][0]
+    update.message.reply_text(age, reply_markup = ReplyKeyboardMarkup(
+        [
+            ['Back']
+        ], resize_keyboard=True
+    ))
+    connector.commit()
+    return MYAGE
 
 def cancel(update, context):
     update.message.reply_text(
@@ -249,10 +261,15 @@ def main():
             ],
             MYINFO: [
                 MessageHandler(Filters.regex('My name'), my_name),
+                MessageHandler(Filters.regex('My age'), my_age),
                 MessageHandler(Filters.regex('Back'), back_to_main_menu)
             ],
 
             MYNAME: [
+                MessageHandler(Filters.regex('Back'), my_info)
+            ],
+
+            MYAGE: [
                 MessageHandler(Filters.regex('Back'), my_info)
             ],
             CHANGE: [
