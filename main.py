@@ -1,4 +1,4 @@
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, KeyboardButton, replymarkup, update
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, KeyboardButton, replymarkup, update 
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -8,6 +8,7 @@ from telegram.ext import (
     CallbackContext,
 )
 import logging
+import telegram
 from  keys import API_TOKEN
 from connector import *
 from datetime import *
@@ -22,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 def start(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
-
     result = cursor.execute(
         "SELECT telegram_id, first_name, last_name, user_name from registration WHERE telegram_id = '{}'".format(chat_id)
     ).fetchall()
@@ -47,26 +47,49 @@ def request_first_name(update, context):
 
 
 def get_first_name(update, context):
+    first_name_spliter = update.effective_message
+    print(first_name_spliter)
+    a = first_name_spliter.text.split()
     first_name = update.message.text
-    print(first_name)
-    request_last_name(update, context)
-    cursor.execute("UPDATE registration SET first_name = '{}' WHERE telegram_id = '{}'"
-    .format(first_name, update.message.chat_id))
-    connector.commit()
-    return LAST_NAME
+    if len(a) == 1 and len(first_name) < 20:
+        if first_name[0].isupper() and first_name[1:].islower():
+            cursor.execute("UPDATE registration SET first_name = '{}' WHERE telegram_id = '{}'".format(first_name, update.message.chat_id))
+            connector.commit()
+            request_last_name(update, context)
+            return LAST_NAME
+        else:
+             update.message.reply_text("First letter of name must be capitalised and the rest in lower case")
+    elif len(a) == 2 and len(first_name) < 20:
+        if (a[0][0].isupper() and a[1][0].isupper()) and (a[0][1:].islower() and a[1][1:].islower()):
+            cursor.execute("UPDATE registration SET first_name = '{}' WHERE telegram_id = '{}'"
+            .format(first_name, update.message.chat_id))
+            connector.commit()
+            request_last_name(update, context)
+            return LAST_NAME
+        else:
+             update.message.reply_text("First letters of your name must be capitalised and the rest in lower case")
+    else:
+        update.message.reply_text("Wrong format. Enter only your first name, and make sure it does not exceed 20 characters!")
 
 def request_last_name(update, context):
     update.message.reply_text("What is your last name?")
     return LAST_NAME
 
 def get_last_name(update, context):
+    last_name_spliter = update.effective_message
     last_name = update.message.text
-    print(last_name)
-    request_birthday(update, context)
-    cursor.execute("UPDATE registration SET last_name = '{}' WHERE telegram_id = '{}'"
-    .format(last_name, update.message.chat_id))
-    connector.commit()
-    return BIRTHDAY
+    a = last_name_spliter.text.split()
+    if len(a) == 1 and len(last_name) < 20:
+        if last_name[0].isupper():
+            request_birthday(update, context)
+            cursor.execute("UPDATE registration SET last_name = '{}' WHERE telegram_id = '{}'"
+            .format(last_name, update.message.chat_id))
+            connector.commit()
+            return BIRTHDAY
+        else:
+            update.message.reply_text("Surname must be capitalised!")
+    else:
+        update.message.reply_text("Wrong format. Surname can only consist of one word and not exceed 20 characters!")
 
 def request_birthday(update, context):
     current_date = datetime.today().strftime('%Y.%m.%d')
@@ -76,13 +99,16 @@ def request_birthday(update, context):
 
 def get_birthday(update, context):
     birthday = update.message.text
-    cursor.execute("UPDATE registration SET birthday = '{}' WHERE telegram_id = '{}'"
-    .format(birthday, update.message.chat_id))
-    connector.commit()
-    cursor.execute("UPDATE registration SET age = CAST(round(strftime(CURRENT_DATE) - strftime(birthday)) as INT)")
-    connector.commit()
-    request_phone(update, context)
-    return PHONE
+    if birthday == ('%Y.%m.%d'):
+        cursor.execute("UPDATE registration SET birthday = '{}' WHERE telegram_id = '{}'"
+        .format(birthday, update.message.chat_id))
+        connector.commit()
+        cursor.execute("UPDATE registration SET age = CAST(round(strftime(CURRENT_DATE) - strftime(birthday)) as INT)")
+        connector.commit()
+        request_phone(update, context)
+        return PHONE
+    else:
+        update.message.reply_text("Please enter your birthday in the given format!")
 
 
 def request_phone(update, context):
@@ -197,8 +223,8 @@ def my_info(update, context):
 
 def my_name(update, context):
     full_name = cursor.execute("SELECT first_name, last_name FROM registration WHERE telegram_id='{}'"
-    .format(update.effective_chat.id)).fetchall()[0][0:2]
-    update.message.reply_text(full_name, reply_markup=ReplyKeyboardMarkup(
+    .format(update.effective_chat.id)).fetchall()[0]
+    update.message.reply_text(full_name[0] + " " + full_name[1], reply_markup=ReplyKeyboardMarkup(
         [
             ['Back']
         ], resize_keyboard=True
@@ -207,14 +233,18 @@ def my_name(update, context):
     return MYNAME
 
 def my_age(update, context):
-    age = cursor.execute("SELECT age FROM registration WHERE telegram_id = '{}'".format(update.effective_chat.id)).fetchall()[0][0]
-    update.message.reply_text(age, reply_markup = ReplyKeyboardMarkup(
-        [
-            ['Back']
-        ], resize_keyboard=True
-    ))
-    connector.commit()
-    return MYAGE
+    try:
+        age = cursor.execute("SELECT age FROM registration WHERE telegram_id = '{}'".format(update.effective_chat.id)).fetchall()[0][0]
+        update.message.reply_text(age, reply_markup = ReplyKeyboardMarkup(
+            [
+                ['Back']
+            ], resize_keyboard=True
+        ))
+        connector.commit()
+        return MYAGE
+    except telegram.error.BadRequest:
+        update.message.reply_text("You haven't provided your birthday!")
+
 
 def cancel(update, context):
     update.message.reply_text(
