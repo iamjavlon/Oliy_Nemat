@@ -98,18 +98,33 @@ def request_birthday(update, context):
     return BIRTHDAY
 
 def get_birthday(update, context):
-    birthday = update.message.text
-    if birthday == ('%Y.%m.%d'):
-        cursor.execute("UPDATE registration SET birthday = '{}' WHERE telegram_id = '{}'"
-        .format(birthday, update.message.chat_id))
-        connector.commit()
-        cursor.execute("UPDATE registration SET age = CAST(round(strftime(CURRENT_DATE) - strftime(birthday)) as INT)")
-        connector.commit()
-        request_phone(update, context)
-        return PHONE
-    else:
-        update.message.reply_text("Please enter your birthday in the given format!")
-
+    try:
+        birthday = update.message.text
+        year, month, day = [i for i in birthday.split(".")]
+        if len(year) == 4 and len(month) == 2 and len(day) == 2:
+            if int(year) <= 2016:
+                if  int(year) >= 1940:
+                    if int(month) in list(range(1,13)):
+                        if int(day) in list(range(1,32)):
+                            cursor.execute("UPDATE registration SET birthday = '{}' WHERE telegram_id = '{}'"
+                            .format(birthday, update.message.chat_id))
+                            connector.commit()
+                            cursor.execute("UPDATE registration SET age = CAST(round(strftime(CURRENT_DATE) - strftime(birthday)) as INT)")
+                            connector.commit()
+                            request_phone(update, context)
+                            return PHONE
+                        else:
+                            update.message.reply_text('Please use proper birth day!')
+                    else:
+                        update.message.reply_text('Please use proper birth month!')    
+                else:
+                    update.message.reply_text('Please use proper birth year!')
+            else:
+                update.message.reply_text('You must be over 5 years old!')
+        else:
+            update.message.reply_text("Please enter your birthday in the given format!")
+    except ValueError:
+        update.message.reply_text('Please enter your birthday in the given format!')
 
 def request_phone(update, context):
     buttons = [
