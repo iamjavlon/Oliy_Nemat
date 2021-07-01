@@ -99,21 +99,29 @@ def request_phone(update, context):
 
 
 def get_phone(update, context):
-    phone = update.message.contact.phone_number
-    phone_as_text = update.message.text
     try:
-        if phone_as_text[0:4] == '+998' or phone_as_text[0:3] == '998' or update.message.contact.phone_number:
-            if len(phone_as_text) == 13 or len(phone_as_text) == 12:  
-                cursor.execute("UPDATE registration SET phone_number = '{}' WHERE telegram_id = '{}'"
-                .format(phone or phone_as_text, update.message.chat_id))
-                connector.commit()
-                update.message.reply_text("Great, now let's see the main menu")
-                print(phone)
-                main_menu(update, context)
-                return MAIN_MENU
+        if update.message.text:
+            if len(update.message.text) == 13 or len(update.message.text) == 12:
+                phone_as_text = update.message.text
+                if phone_as_text[0:4] == '+998' or phone_as_text[0:3] == '998':
+                    cursor.execute("UPDATE registration SET phone_number = '{}' WHERE telegram_id = '{}'"
+                    .format(phone_as_text, update.message.chat_id))
+                    connector.commit()
+                    update.message.reply_text("Great, now let's see the main menu")
+                    main_menu(update, context)
+                    return MAIN_MENU
+                else:
+                    update.message.reply_text('Incorrect country code')
             else: 
-                update.message.reply_text('NUmber of characters must be 12 or 13')
-        else:
-            update.message.reply_text('Incorrect country code')
-    except ValueError:
-        update.message.reply_text("Send your phone number in this format: +998********")
+                update.message.reply_text('Number of characters must be 12 or 13')       
+        elif update.message.contact.phone_number:
+            phone = update.message.contact.phone_number
+            cursor.execute("UPDATE registration SET phone_number = '{}' WHERE telegram_id = '{}'"
+            .format(phone, update.message.chat_id))
+            connector.commit()
+            update.message.reply_text("Great, now let's see the main menu")
+            print(phone)
+            main_menu(update, context)
+            return MAIN_MENU
+    except AttributeError:
+        update.message.reply_text('Please send your phone number either using the button or in the typed form')
